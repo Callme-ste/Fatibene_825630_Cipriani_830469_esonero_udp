@@ -43,7 +43,7 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.debug.1657981884" name="MinGW C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.debug"/>
 						</toolChain>
 					</folderInfo>
-					<fileInfo id="cdt.managedbuild.config.gnu.mingw.exe.debug.705972667.1820269354" name="server.c" rcbsApplicability="disable" resourcePath="server-project/src/server.c" toolsToInvoke="cdt.managedbuild.tool.gnu.c.linker.1880682090">
+					<fileInfo id="cdt.managedbuild.config.gnu.mingw.exe.debug.705972667.1820269354" name="server.c" rcbsApplicability="disable" resourcePath="server-project/src/main.c" toolsToInvoke="cdt.managedbuild.tool.gnu.c.linker.1880682090">
 						<tool id="cdt.managedbuild.tool.gnu.c.linker.1880682090" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker">
 							<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.c.link.option.libs.1738610393" name="Libraries (-l)" superClass="gnu.c.link.option.libs" valueType="libs">
 								<listOptionValue builtIn="false" value="ws2_32"/>
