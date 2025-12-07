@@ -1,239 +1,184 @@
-# Esonero di Laboratorio UDP - Reti di Calcolatori (ITPS A-L) 2025-26 :santa: :christmas_tree: :gift:
+# Primo Esonero di Laboratorio - Reti di Calcolatori (ITPS A-L) a.a. '25-26 
 
-## Obiettivo Generale
-**Migrare** l'applicazione client/server del servizio meteo dal protocollo **TCP** (realizzata nel primo esonero) al protocollo **UDP** (User Datagram Protocol).
+## Obiettivo
 
-L'obiettivo è modificare il codice già scritto per l'assegnazione TCP in modo da usare UDP come protocollo di trasporto, mantenendo invariato il protocollo applicativo (strutture dati, formati, funzionalità).
+Progettare ed implementare un'applicazione TCP client/server, dove il server è un servizio meteo che risponde alle richieste del client.
 
-## Cosa Cambia nella Migrazione da TCP a UDP
+## Specifica del Protocollo Applicativo
 
-### Modifiche da Apportare al Codice
+### Formato dei Messaggi
 
-Nel passaggio da TCP a UDP, dovrete modificare **solo il livello di trasporto**, lasciando invariato tutto il resto:
+Tutti i messaggi scambiati tra client e server seguono un protocollo definito in `protocol.h`.
 
-**DA MODIFICARE:**
-- Tipo di socket
-- Chiamate di sistema
-- Output
+#### Messaggio di Richiesta (Client → Server)
 
-**NON MODIFICARE:**
-- Protocollo applicativo: strutture `struct request` e `struct response`
-- Interfaccia a linea di comando (opzioni `-s`, `-p`, `-r`)
-- Logica di business: parsing richieste, validazione città, generazione dati meteo
-- Funzioni `get_temperature()`, `get_humidity()`, `get_wind()`, `get_pressure()`
-
-## Protocollo Applicativo
-
-**IMPORTANTE**: Il protocollo applicativo rimane **identico** all'assegnazione TCP. Le strutture dati definite in `protocol.h` **NON devono essere modificate**.
-
-### Strutture Dati
-
-Le seguenti strutture devono rimanere invariate rispetto al primo esonero:
-
-**Richiesta Client:**
 ```c
-struct request {
-    char type;      // 't'=temperatura, 'h'=umidità, 'w'=vento, 'p'=pressione
-    char city[64];  // nome città (null-terminated)
-};
+typedef struct {
+    char type;        // Weather data type: 't', 'h', 'w', 'p'
+    char city[64];    // City name (null-terminated string)
+} weather_request_t;
 ```
 
-> [!NOTE]
-> **Valori validi per il campo `type`:**
-> - `'t'` = temperatura
-> - `'h'` = umidità
-> - `'w'` = vento
-> - `'p'` = pressione
->
-> **Qualsiasi altro carattere** è considerato **richiesta invalida** e deve generare `status=2` nella risposta del server.
+**Tipi validi:**
+Il campo `type` può assumere solo questi valori:
+- `'t'` = Temperatura
+- `'h'` = Umidità
+- `'w'` = Velocità del vento
+- `'p'` = Pressione
 
-**Risposta Server:**
+#### Messaggio di Risposta (Server → Client)
+
 ```c
-struct response {
-    unsigned int status;  // 0=successo, 1=città non trovata, 2=richiesta invalida
-    char type;            // eco del tipo richiesto
-    float value;          // dato meteo generato
-};
+typedef struct {
+    unsigned int status;  // Response status code
+    char type;            // Echo of request type
+    float value;          // Weather data value
+} weather_response_t;
 ```
 
-### Network Byte Order
+**Codici di stato:**
+Il campo `status` può assumere solo questi valori:
+- `0` = Successo
+- `1` = Città non disponibile
+- `2` = Richiesta non valida
 
-> [!WARNING]
-> Durante la serializzazione e deserializzazione delle strutture dati, è necessario gestire correttamente il network byte order per i campi numerici:
-> - **`unsigned int status`**: usare `htonl()` prima dell'invio e `ntohl()` dopo la ricezione
-> - **`float value`**: convertire in formato network byte order usando la tecnica mostrata a lezione (conversione `float` → `uint32_t` → `htonl/ntohl` → `float`)
-> - **`char type` e `char city[]`**: essendo campi a singolo byte, non richiedono conversione
->
-> **IMPORTANTE - Serializzazione manuale obbligatoria:**
-> - **NON inviate le struct direttamente** con `sendto(&request, sizeof(request), ...)` o `sendto(&response, sizeof(response), ...)`
-> - Il compilatore può aggiungere **padding** tra i campi della struct, causando problemi di portabilità
-> - **Dovete creare un buffer separato** e copiare manualmente i campi uno per uno, come mostrato a lezione
-> - Esempio: creare un `char buffer[...]` e copiare i campi in sequenza dopo averli convertiti in network byte order
+**Campi della risposta:**
+- `status`: codice di stato della risposta
+- `type`: eco del tipo di dato richiesto (`'t'`, `'h'`, `'w'`, `'p'`)
+- `value`: valore numerico del dato meteo
 
-Esempio conversione float e serializzazione (come mostrato a lezione):
-```c
-// Invio response: serializzazione in buffer separato
-char buffer[sizeof(uint32_t) + sizeof(char) + sizeof(float)];
-int offset = 0;
+**Il client deve costruire il messaggio da visualizzare sul terminale:**
 
-// Serializza status (con network byte order)
-uint32_t net_status = htonl(response.status);
-memcpy(buffer + offset, &net_status, sizeof(uint32_t));
-offset += sizeof(uint32_t);
+Per risposte con successo (status = 0):
+- Temperatura (type = 't'): `Nomecittà: Temperatura = XX.X°C` (1 cifra decimale)
+- Umidità (type = 'h'): `Nomecittà: Umidità = XX.X%` (1 cifra decimale)
+- Vento (type = 'w'): `Nomecittà: Vento = XX.X km/h` (1 cifra decimale)
+- Pressione (type = 'p'): `Nomecittà: Pressione = XXXX.X hPa` (1 cifra decimale)
 
-// Serializza type (1 byte, no conversione)
-memcpy(buffer + offset, &response.type, sizeof(char));
-offset += sizeof(char);
-
-// Serializza value (float con network byte order)
-uint32_t temp;
-memcpy(&temp, &response.value, sizeof(float));
-temp = htonl(temp);
-memcpy(buffer + offset, &temp, sizeof(float));
-offset += sizeof(float);
-
-// Invio del buffer
-sendto(sock, buffer, offset, 0, ...);
-
-// Ricezione e deserializzazione analoga
-```
-
-### Formati di Output
+Per risposte con errore (status != 0):
+- `Città non disponibile` (status = 1)
+- `Richiesta non valida` (status = 2)
 
 > [!WARNING]
 > - Il formato dell'output deve essere **ESATTAMENTE** come specificato di seguito
 > - **Lingua italiana obbligatoria** - NON tradurre in inglese o altre lingue
-> - **NO caratteri extra** - seguire esattamente gli esempi forniti
+->  **NO caratteri extra** (es. "Received result from server IP" invece di "Ricevuto risultato dal server ip")
 > - Gli **spazi e la punteggiatura** devono corrispondere esattamente agli esempi
 
-Il client deve stampare l'indirizzo IP del server (risultato della risoluzione DNS) seguito dal messaggio appropriato:
+### Funzioni di Generazione Dati
 
-**Successo (`status=0`):**
-- Temperatura: `"Ricevuto risultato dal server <nomeserver> (ip <IP>). NomeCittà: Temperatura = XX.X°C"`
-- Umidità: `"Ricevuto risultato dal server <nomeserver> (ip <IP>). NomeCittà: Umidità = XX.X%"` (sono accettate entrambe le grafie: "Umidità" e "Umidita'")
-- Vento: `"Ricevuto risultato dal server <nomeserver> (ip <IP>). NomeCittà: Vento = XX.X km/h"`
-- Pressione: `"Ricevuto risultato dal server <nomeserver> (ip <IP>). NomeCittà: Pressione = XXXX.X hPa"`
+Il server deve implementare le seguenti funzioni con valori casuali entro range realistici:
 
-**Note sul formato:**
-- I valori devono essere formattati con **una cifra decimale** (es. 23.5, non 23.50 o 23)
-- Il nome della città deve mantenere la capitalizzazione corretta (prima lettera maiuscola)
-
-**Errori:**
-- `status 1`: `"Ricevuto risultato dal server <nomeserver> (ip <IP>). Città non disponibile"`
-- `status 2`: `"Ricevuto risultato dal server <nomeserver> (ip <IP>). Richiesta non valida"`
-
-> [!NOTE]
-> **Risoluzione DNS del server (client):**
-> - I valori `<nomeserver>` e `<IP>` dono essere ottenuti tramite le funzioni di **DNS lookup**
-> - Se l'utente specifica `-s localhost`, il client risolve `localhost` → `127.0.0.1` e poi fa reverse lookup `127.0.0.1` → `localhost`
-> - Se l'utente specifica `-s 127.0.0.1`, il client fa reverse lookup `127.0.0.1` → `localhost`
-
-### Esempi di Output
-
-**Richiesta con successo (usando default `localhost`):**
-```bash
-$ ./client-project -r "t bari"
-Ricevuto risultato dal server localhost (ip 127.0.0.1). Bari: Temperatura = 22.5°C
+```c
+float get_temperature(void);    // Range: -10.0 to 40.0 °C
+float get_humidity(void);       // Range: 20.0 to 100.0 %
+float get_wind(void);           // Range: 0.0 to 100.0 km/h
+float get_pressure(void);       // Range: 950.0 to 1050.0 hPa
 ```
+Tutte le funzioni restituiscono valori float da inserire nel campo `value` della struttura di risposta.
 
-**Richiesta esplicita con nome host:**
-```bash
-$ ./client-project -s localhost -r "h napoli"
-Ricevuto risultato dal server localhost (ip 127.0.0.1). Napoli: Umidità = 65.3%
-```
+## Comportamento del Client
 
-**Richiesta con indirizzo IP diretto:**
-```bash
-$ ./client-project -s 127.0.0.1 -r "w milano"
-Ricevuto risultato dal server localhost (ip 127.0.0.1). Milano: Vento = 12.8 km/h
-```
+### Interfaccia da Riga di Comando
 
-**Città non disponibile:**
-```bash
-$ ./client-project -r "h parigi"
-Ricevuto risultato dal server localhost (ip 127.0.0.1). Città non disponibile
-```
-
-**Richiesta non valida:**
-```bash
-$ ./client-project -r "x roma"
-Ricevuto risultato dal server localhost (ip 127.0.0.1). Richiesta non valida
-```
-
-## Interfaccia Client
-
-**Sintassi:**
 ```
 ./client-project [-s server] [-p port] -r "type city"
 ```
 
 **Parametri:**
-- `-s server`: server può indicare o l'hostname del server oppure il suo indirizzo IP (default: `localhost`)
-- `-p port`: porta server (default: `56700`)
-- `-r request`: richiesta meteo obbligatoria (formato: `"type city"`)
+- `-s server`: Indirizzo del server (opzionale, default: `127.0.0.1`)
+- `-p port`: Porta del server (opzionale, default: `56700`)
+- `-r request`: Richiesta meteo nel formato `"type city"` (obbligatorio)
 
-**Note di parsing richiesta:**
-- La stringa della richiesta può contenere spazi multipli, ma **non ammette caratteri di tabulazione** (`\t`)
-- Per il parsing della richiesta: **il primo token (prima dello spazio) deve essere un singolo carattere** che specifica il `type`, tutto il resto (dopo lo spazio) è da considerarsi come `city`
-- **Se il primo token contiene più di un carattere** (es. `-r "temp bari"`), il client **deve segnalare un errore e NON inviare** la richiesta
-- Sono accettati entrambi i casi di spelling dei **caratteri accentati** (e.g., Umidita' e Umidità sono entrambi validi)
-- Esempio valido: `-r "p Reggio Calabria"` → type='p', city="Reggio Calabria"
-- Esempio invalido: `-r "temp roma"` → errore lato client (primo token non è un singolo carattere)
+### Esecuzione
 
-**Flusso operativo:**
-1. Analizza argomenti da linea di comando
-2. Crea socket UDP
-3. Invia richiesta al server
-4. Riceve risposta
-5. Visualizza risultato formattato
-6. Chiude socket
+Il client deve essere eseguibile automaticamente senza interazione dell'utente. L'applicazione esegue una singola richiesta e termina:
 
-## Interfaccia Server
+```bash
+client-project.exe -r "t bari"        # da terminale Windows
+./client-project -r "h invalid_city"  # da terminale Linux/macOS
+./client-project -r "x roma"
+```
+*Nota*: in caso di città con spazi (es., `-r "p Reggio Calabria"`), si assumerà che il primo carattere specificherà il `type` e tutto il resto sarà da considerarsi come `city`. 
 
-**Sintassi:**
+### Esempi di Output
+
+**Richiesta con successo:**
+```bash
+$ ./client-project -r "t bari"
+Ricevuto risultato dal server ip 127.0.0.1. Bari: Temperatura = 22.5°C
+```
+
+**Città non disponibile:**
+```bash
+$ ./client-project -r "h parigi"
+Ricevuto risultato dal server ip 127.0.0.1. Città non disponibile
+```
+
+**Richiesta non valida:**
+```bash
+$ ./client-project -r "x roma"
+Ricevuto risultato dal server ip 127.0.0.1. Richiesta non valida
+```
+
+### Flusso di Esecuzione del Client
+
+1. Analizza gli argomenti da riga di comando
+2. Stabilisce connessione TCP con il server
+3. Invia la richiesta meteo
+4. Riceve la risposta dal server
+5. Costruisce e visualizza il messaggio nel formato:
+   ```
+   Ricevuto risultato dal server ip <ip_address>. <messaggio_costruito>
+   ```
+   dove `<messaggio_costruito>` dipende dallo status:
+   - Se `status = 0`: formatta il messaggio in base al `type` e `value` ricevuti
+   - Se `status != 0`: visualizza il messaggio di errore appropriato
+6. Chiude la connessione e termina
+
+**Gestione degli errori:**
+- Argomenti da riga di comando non validi → stampa l'uso corretto ed esce
+- Fallimento della connessione → stampa errore ed esce
+- Risposta non valida → stampa errore ed esce
+
+## Comportamento del Server
+
+### Interfaccia da Riga di Comando
+
 ```
 ./server-project [-p port]
 ```
 
 **Parametri:**
-- `-p port`: porta ascolto (default: `56700`)
+- `-p port`: Porta di ascolto (opzionale, default: `56700`)
 
-**Comportamento:**
-Il server rimane attivo continuamente in ascolto sulla porta specificata. Per ogni datagramma ricevuto:
-1. Riceve richiesta (acquisendo indirizzo client)
-2. Valida il tipo di richiesta e il nome della città
-3. Genera il valore meteo con le funzioni `get_*()`
-4. Invia risposta al client, usando l'indirizzo acquisito
-5. Continua in ascolto per nuove richieste
+### Flusso di Esecuzione del Server
 
-**Logging delle Richieste:**
+1. Analizza gli argomenti da riga di comando
+2. Crea socket TCP e lo lega alla porta specificata
+3. Si mette in ascolto per connessioni in ingresso
+4. Per ogni connessione client:
+   - Accetta la connessione
+   - Riceve la richiesta
+   - Visualizza il messaggio:
+     ```
+     Richiesta '<type> <city>' dal client ip <ip_address>
+     ```
+   - Valida la richiesta (tipo e città)
+   - Se valida (`status = 0`):
+     - Genera il valore meteo appropriato usando le funzioni `get_*`
+     - Imposta type uguale a quello della richiesta
+     - Imposta value con il valore generato
+   - Se non valida (`status = 1` o `2`):
+     - Imposta` type = '\0'`
+     - Imposta `value = 0.0`
+   - Invia la risposta (struttura `weather_response_t`)
+   - Chiude la connessione con il client
+5. Torna al punto 4 (il server non termina mai a meno che non venga esplicitamente terminato)
 
-Il server deve stampare a console un log per ogni richiesta ricevuta, includendo sia il nome host che l'indirizzo IP del client.
+### Città Supportate
 
-**Esempio di log:**
-```
-Richiesta ricevuta da localhost (ip 127.0.0.1): type='t', city='Roma'
-```
-
-> [!NOTE]
-> **Risoluzione DNS:**
-> - Così come il client, anche il server deve usare opportunamente le funzioni di **DNS lookup** a partire da nome host o indirizzo.
-
-**Note:**
-- Ogni richiesta è indipendente e stateless
-- Il server non termina autonomamente, rimane in esecuzione indefinitamente e può essere interrotto solo forzatamente tramite **Ctrl+C** (SIGINT)
-
-## Funzioni di Generazione Dati
-
-Le funzioni di generazione dati rimangono **identiche** al primo esonero. Il server implementa quattro funzioni che generano valori casuali:
-- `get_temperature()`: temperatura casuale tra -10.0 e 40.0 °C
-- `get_humidity()`: umidità casuale tra 20.0 e 100.0%
-- `get_wind()`: velocità vento casuale tra 0.0 e 100.0 km/h
-- `get_pressure()`: pressione casuale tra 950.0 e 1050.0 hPa
-
-## Città Supportate
-
-Le città supportate rimangono **identiche** al primo esonero. Il server deve riconoscere almeno 10 città italiane (confronto case-insensitive):
+Il server deve supportare almeno queste città italiane:
 - Bari
 - Roma
 - Milano
@@ -245,75 +190,38 @@ Le città supportate rimangono **identiche** al primo esonero. Il server deve ri
 - Firenze
 - Venezia
 
-**Note sulla validazione nomi città:**
-- Le città possono contenere spazi singoli (es. "San Marino")
-- **Gli spazi multipli consecutivi NON vengono normalizzati**: la stringa viene trattata così com'è (es. "San  Marino" con due spazi probabilmente non verrà riconosciuta e darà `status=1`)
-- **Caratteri speciali** (es. @, #, $, %, ecc.) e **caratteri di tabulazione** non sono ammessi e devono causare un errore di validazione (`status=2`)
-- Il confronto rimane case-insensitive (es. "bari", "BARI", "Bari" sono tutti validi)
+I nomi delle città sono case-insensitive.
 
-## Requisiti Tecnici
+## Requisiti di Implementazione
 
-### 1. Organizzazione del Codice
-- Non modificate nomi dei file e delle cartelle fornite nel progetto template
-- Potete aggiungere nuovi file .h e .c se necessario
+1. **Definizione del protocollo**: Il file header `protocol.h` deve contenere:
+   - Strutture di richiesta/risposta
+   - Prototipi delle funzioni di generazione dati
+   - Definizioni dei codici di stato
+   - Eventuali costanti condivise tra client e server
 
-### 2. Portabilità Multi-Piattaforma
-Il codice deve compilare ed eseguire correttamente su:
-- Windows
-- Linux
-- macOS
+2. **File sorgente**:
+   - `client.c`: Implementazione del client
+   - `server.c`: Implementazione del server
+   - `protocol.h`: Definizioni del protocollo condivise (file presente sia nel progetto client sia in quello server)
 
-### 3. Network Byte Order
-- Durante la serializzazione e deserializzazione delle strutture dati, è necessario gestire opportunamente il network byte order in base al tipo del campo
+3. **Portabilità**: Il codice deve compilare ed eseguire su Windows, Linux e macOS
 
-### 4. Risoluzione Nomi DNS
-Il codice deve supportare **sia nomi simbolici** (es. `localhost`) che **indirizzi IP** (es. `127.0.0.1`) come parametro `-s` del client. Vedere le note nelle sezioni "Formati di Output" e "Logging delle Richieste" per i dettagli sulla risoluzione e reverse lookup DNS
+4. **Formato di output**: Il codice deve generare output esattamente come indicato nelle specifiche e negli esempi
 
-### 5. Gestione errori
-- Gestione appropriata degli errori
-- Nessun crash
-- Validazione corretta degli input utente
-- **Validazione lunghezza nome città (lato client)**: se il nome della città supera 63 caratteri (64 incluso il null-terminator), il client **deve segnalare un errore all'utente e NON inviare** la richiesta al server
+5. **Portabilità**: Il codice deve compilare ed eseguire su Windows, Linux e macOS
 
-### 6. Compatibilità Eclipse CDT
-Il progetto deve essere compatibile con Eclipse CDT e includere i file di configurazione necessari (`.project`, `.cproject`).
+6. **Compatibilità Eclipse CDT**: Il codice deve funzionare in progetti Eclipse CDT
 
-## Note di Validazione
+7. **Sicurezza della memoria**: Nessun buffer overflow, memory leak o comportamento indefinito
 
-### Client
-
-> [!NOTE]
-> **Validazione del campo `city`:**
-> - Il campo `city` ha una lunghezza massima di 64 caratteri, incluso il terminatore `\0`
-> - La verifica della lunghezza è a carico del client prima di inviare la richiesta
-> - Il campo `city` può contenere spazi multipli, ma non ammette caratteri di tabulazione (`\t`)
->
-> **Validazione della richiesta da linea di comando:**
-> - La stringa della richiesta (`-r`) può contenere spazi multipli, ma non ammette caratteri di tabulazione (`\t`)
-
-### Server
-
-> [!NOTE]
-> **Caratteristiche del protocollo UDP:**
-> - Non c'è fase di "connessione" o "accettazione" come in TCP
-> - Ogni richiesta è indipendente e stateless
-> - Il server deve acquisire l'indirizzo del client da ogni datagramma ricevuto
->
-> **Ciclo di vita del server:**
-> - Il server non termina autonomamente
-> - Rimane in esecuzione indefinitamente
-> - Può essere interrotto solo forzatamente tramite **Ctrl+C** (SIGINT)
 
 ## Consegna
 
-- **Scadenza**: 21 dicembre 2025, entro le ore 23.59.59
-- **Form di prenotazione / consegna**: [link](https://forms.gle/P4kWH3M3zjXjsWWP7)
+- **Scadenza**: 28 novembre 2025, entro h. 23.59.59
+- **Form di prenotazione / consegna**: [link](https://forms.gle/jwWg3y8zFaFUbH7g7)
 - **Formato**: Link a repository GitHub accessibile pubblicamente
-- **Risultati**: [link](https://collab-uniba.github.io/correzione_esonero_reti_udp_itps_A-L_25-26/aggregate-report.html)
 - **Note**:
-   - Una sola consegna per coppia.
-   - Le coppie non si possono modificare, al limite i due partecipanti di una coppia possono decidere di effettuare l'esonero UDP da soli.
-   - Non è necessario ricompilare il form di consegna dopo aggiornamenti al repository
-   - La pagina dei risultati si aggiorna ogni ora, scaricando l'ultima versione di ciascun progetto fino alla scadenza.
-
-_Ver. 1.0.1_
+   - Una sola consegna per coppia
+ 
+_Ver. 1.0.3_

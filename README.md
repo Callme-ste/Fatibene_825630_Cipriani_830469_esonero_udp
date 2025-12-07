@@ -1,11 +1,11 @@
-# Esonero UDP - Corso di Reti di Calcolatori - ITPS A-L 2025-26
+# Esonero TCP - Corso di Reti di Calcolatori - ITPS A-L 2025-26
 
-Repository per l'assegnazione della prima prova di esonero: client-server UDP.
+Repository per l'assegnazione della prima prova di esonero: client-server TCP.
 
 
 ## Descrizione
 
-Questo repository contiene la struttura base per lo sviluppo di un'applicazione client-server UDP in linguaggio C, utilizzando la libreria standard delle socket. Il codice è progettato per essere portabile su sistemi operativi **Windows**, **Linux** e **macOS**.
+Questo repository contiene la struttura base per lo sviluppo di un'applicazione client-server TCP in linguaggio C, utilizzando la libreria standard delle socket. Il codice è progettato per essere portabile su sistemi operativi **Windows**, **Linux** e **macOS**.
 
 ## Struttura del Repository
 
@@ -28,21 +28,14 @@ Il repository è organizzato in due progetti Eclipse CDT separati:
         └── protocol.h      # Header con definizioni e prototipi
 ```
 
-**⚠️ IMPORTANTE - Struttura del Progetto:**
-- **NON modificare** i nomi dei file esistenti (`main.c`, `protocol.h`)
-- **NON modificare** i nomi delle cartelle esistenti (`client-project`, `server-project`, `src`)
-- **NON eliminare o modificare a
-  mano** i file di configurazione Eclipse (`.project`, `.cproject`)
-- È possibile **aggiungere nuovi file** se necessario (es. file `.c` o `.h` aggiuntivi)
-
 ## Come Utilizzare il Repository
 
 ### 1. Creare la propria copia del repository
 
 1. Cliccare su "Use this template" in alto a destra su GitHub
 2. Creare un nuovo repository personale
-   - Rinominate il repository sostituendo la parola _template_ con il vostro _cognome_ seguito dalla _matricola_ (`template_esonero_udp` -> `cognome_12345_esonero_udp`)
-   - Se l'esonero è svolto in coppia, il nome del repository sarà `cognome1_12345_cognome2_6789_esonero_udp`
+    - Rinominare il repository sostituendo la parola _template_ con il vostro _cognome_ seguito dalla _matricola_ (`template_esonero_tcp` -> `cognome_12345_esonero_tcp`)
+    - Se l'esonero è svolto in coppia, il nome del repository sarà `cognome1_12345_cognome2_6789_esonero_tcp`
 4. Clonare il repository sul proprio computer:
    ```bash
    git clone <url-del-tuo-repository>
@@ -103,54 +96,8 @@ Contiene:
 
 [Protocollo applicativo e istruzioni per la consegna](Assegnazione.md)
 
-## Lavorare con Git
-
-### Workflow Consigliato
-
-Per mantenere il repository sincronizzato e lavorare in modo efficace, si consiglia di seguire questo workflow:
-
-#### 1. Prima di Iniziare a Lavorare
-
-```bash
-git pull
-```
-Scarica le ultime modifiche dal repository remoto. È importante farlo **prima** di iniziare a lavorare per evitare conflitti.
-
-#### 2. Verificare lo Stato del Repository
-
-```bash
-git status
-```
-Mostra i file modificati, aggiunti o eliminati nel working directory.
-
-#### 3. Aggiungere i File Modificati
-
-```bash
-git add <nome-file>
-# oppure per aggiungere tutti i file modificati
-git add .
-```
-
-#### 4. Creare un Commit
-
-```bash
-git commit -m "Descrizione chiara delle modifiche"
-```
-
-#### 5. Inviare le Modifiche al Repository Remoto
-
-```bash
-git push
-```
-
-#### 6. Rimanere sincronizzati se lavorate in coppia
-
-```bash
-git pull
-```
-
-Eseguirlo di frequente, prima di ogni commit.
-
 ## Licenza
 
 Vedere il file [LICENSE](LICENSE) per i dettagli.
+"# Fatibene_825630_Cipriani_830469_esonero_udp" 
+"# Fatibene_825630_Cipriani_830469_esonero_udp" 
